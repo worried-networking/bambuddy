@@ -67,6 +67,9 @@ class MappedSpoolFields(TypedDict):
     # material number (#2870). Read-only in Spoolman mode — the number is
     # filament-level there and maintained in Spoolman itself.
     material_number: str | None
+    # Id of the Spoolman filament the spool belongs to; None when it has no
+    # usable one. The material number lives on that filament.
+    spoolman_filament_id: int | None
     storage_location: str | None
     location_id: int | None
     k_profiles: list[Any]
@@ -122,6 +125,11 @@ def _safe_int(value: object, fallback: int) -> int:
     except (TypeError, ValueError):
         pass
     return fallback
+
+
+def _filament_id(value: object) -> int | None:
+    """A Spoolman filament id, or None when it is not a positive integer."""
+    return value if isinstance(value, int) and not isinstance(value, bool) and value > 0 else None
 
 
 def _safe_float(value: object, fallback: float) -> float:
@@ -562,6 +570,7 @@ def _map_spoolman_spool(spool: dict) -> MappedSpoolFields:
         # one — the filter chip builds its options from trimmed values and
         # matches exactly, so a padded number would list and match nothing.
         "material_number": ((filament.get("article_number") or "").strip() or None),
+        "spoolman_filament_id": _filament_id(filament.get("id")),
         "storage_location": spool.get("location") or None,
         "location_id": None,
         "k_profiles": [],

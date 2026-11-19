@@ -70,6 +70,7 @@ from backend.app.services.location_service import (
     maybe_sync_spoolman_locations,
     resolve_spoolman_location_string,
 )
+from backend.app.services.material_number import material_number_matches
 from backend.app.services.printer_manager import PrinterManager, printer_manager
 from backend.app.services.slicer_filament_resolver import resolve_slicer_filament, reusable_slot_filament_id
 from backend.app.services.slot_nozzle import resolve_slot_nozzle
@@ -527,10 +528,14 @@ class SpoolSlotAssignmentRequest(BaseModel):
 @router.get("/spools")
 async def list_spools(
     include_archived: bool = Query(False),
+    material_number: str | None = Query(None, min_length=1, max_length=64),
     db: AsyncSession = Depends(get_db, scope="function"),
     _: User | None = RequirePermissionIfAuthEnabled(Permission.INVENTORY_READ),
 ) -> list[dict]:
-    """Return all Spoolman spools in the InventorySpool format."""
+    """Return all Spoolman spools in the InventorySpool format.
+
+    ``material_number`` keeps the spools whose filament's article number is, or lists, that number.
+    """
     client = await _get_client(db)
     # Sync after we have the route-resolved client so tests that patch the
     # route module's get_spoolman_client/init_spoolman_client also catch the
@@ -541,6 +546,13 @@ async def list_spools(
 
     async with _translate_spoolman_errors():
         spools = await client.get_all_spools(allow_archived=include_archived)
+
+    if material_number is not None:
+        spools = [
+            s
+            for s in spools
+            if material_number_matches((s.get("filament") or {}).get("article_number"), material_number)
+        ]
 
     mapped: list[dict] = []
     spool_ids: list[int] = []

@@ -127,6 +127,17 @@ class TestMapSpoolmanSpool:
         spool = {**MINIMAL_SPOOL, "filament": {**MINIMAL_SPOOL["filament"], "article_number": " 15 "}}
         assert _map_spoolman_spool(spool)["material_number"] == "15"
 
+    def test_spoolman_filament_id_is_the_filament_id(self):
+        """The spool's filament id, so a client can address the shared filament."""
+        spool = {**MINIMAL_SPOOL, "filament": {**MINIMAL_SPOOL["filament"], "id": 7}}
+        assert _map_spoolman_spool(spool)["spoolman_filament_id"] == 7
+
+    def test_spoolman_filament_id_missing_or_malformed_is_none(self):
+        assert _map_spoolman_spool(MINIMAL_SPOOL)["spoolman_filament_id"] is None
+        for value in ("abc", None, True, 0, -3, 1.5):
+            odd = {**MINIMAL_SPOOL, "filament": {**MINIMAL_SPOOL["filament"], "id": value}}
+            assert _map_spoolman_spool(odd)["spoolman_filament_id"] is None
+
     def test_remaining_weight_drives_synthetic_used_for_parity(self):
         """When remaining_weight is set, weight_used = label - remaining and
         the baseline absorbs the used_weight delta. This mirrors the internal

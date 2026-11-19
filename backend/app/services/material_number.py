@@ -73,3 +73,18 @@ async def apply_material_number_inheritance(db: AsyncSession, payload: dict) -> 
         payload = dict(payload)
         payload["material_number"] = number
     return payload
+
+
+def material_number_matches(stored: str | None, wanted: str) -> bool:
+    """True when ``wanted`` is one of the numbers in the ``stored`` text.
+
+    The stored text may hold several numbers separated by ``,`` or ``;`` (a
+    product sold under more than one article number). Each part is trimmed and
+    compared whole and case-sensitively with the trimmed ``wanted``, so
+    ``931923681049`` does not find ``9319236810491``. Whitespace inside a part
+    is not a separator ("PM 70820" is one number). An empty part never matches.
+    """
+    wanted = wanted.strip()
+    if not stored or not wanted:
+        return False
+    return any(part.strip() == wanted for part in stored.replace(";", ",").split(","))
