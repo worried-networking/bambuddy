@@ -65,8 +65,9 @@ class MappedSpoolFields(TypedDict):
     # cost_per_kg, so the catalogue price is never written onto the spool.
     effective_cost_per_kg: float | None
     # Spoolman's native filament.article_number, surfaced as the internal
-    # material number (#2870). Read-only in Spoolman mode — the number is
-    # filament-level there and maintained in Spoolman itself.
+    # material number (#2870). The number is filament-level in Spoolman mode:
+    # the spool form writes it to the filament (PATCH /spoolman/inventory/
+    # filaments/{id}), so every spool of that filament shows the new value.
     material_number: str | None
     # Id of the Spoolman filament the spool belongs to; None when it has no
     # usable one. The material number lives on that filament.
@@ -628,8 +629,9 @@ def _map_spoolman_spool(spool: dict) -> MappedSpoolFields:
         # Spoolman's filament.article_number maps 1:1 onto the internal
         # material number (#2870): both identify the purchasable product.
         # Trimmed for the same reason the schema validator trims the internal
-        # one — the filter chip builds its options from trimmed values and
-        # matches exactly, so a padded number would list and match nothing.
+        # one — the filter chip builds its options from trimmed values and the
+        # search matches whole comma-separated entries, so a padded number
+        # would list and match nothing.
         "material_number": ((filament.get("article_number") or "").strip() or None),
         "spoolman_filament_id": _filament_id(filament.get("id")),
         "storage_location": spool.get("location") or None,

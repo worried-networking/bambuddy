@@ -5352,6 +5352,7 @@ export default {
     materialNumberPlaceholder: '例如：15',
     materialNumberHelp: '內部採購編號 — 同一產品的所有料盤共用。同一產品的新料盤會自動繼承。',
     materialNumberHelpSpoolman: '在 Spoolman 中儲存為耗材的貨號，因此該耗材的所有料盤都會顯示。多個編號請用逗號分隔。',
+    materialNumberNotSaved: '線軸已建立，但物料編號未儲存',
     lastDried: '上次烘乾',
     lastDriedNow: '現在',
     lastDriedHelp: 'AMS 烘乾執行至少一半時長後結束時自動填寫。在其他地方烘乾的料盤請在此設定。',

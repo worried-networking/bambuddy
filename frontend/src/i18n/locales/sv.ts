@@ -5437,6 +5437,7 @@ errors: {
     materialNumberPlaceholder: 't.ex. 15',
     materialNumberHelp: 'Internt inköpsnummer — delas av alla rullar av denna produkt. Nya rullar av samma produkt ärver det.',
     materialNumberHelpSpoolman: 'Sparas i Spoolman som filamentets artikelnummer, så varje rulle av detta filament visar det. Skilj flera nummer åt med kommatecken.',
+    materialNumberNotSaved: 'Rullen skapades, men materialnumret sparades inte',
     lastDried: 'Senast torkad',
     lastDriedNow: 'Nu',
     lastDriedHelp: 'Fylls i när en AMS-torkning som pågått minst halva sin tid avslutas. Ange det här för en rulle som torkats någon annanstans.',

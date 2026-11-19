@@ -5365,6 +5365,7 @@ export default {
     materialNumberPlaceholder: 'z. B. 15',
     materialNumberHelp: 'Interne Einkaufsnummer - wird von allen Spulen dieses Produkts geteilt. Neue Spulen desselben Produkts übernehmen sie.',
     materialNumberHelpSpoolman: 'Wird in Spoolman als Artikelnummer des Filaments gespeichert, daher zeigt jede Spule dieses Filaments sie an. Mehrere Nummern mit Kommas trennen.',
+    materialNumberNotSaved: 'Spule erstellt, aber die Materialnummer wurde nicht gespeichert',
     lastDried: 'Zuletzt getrocknet',
     lastDriedNow: 'Jetzt',
     lastDriedHelp: 'Wird eingetragen, wenn ein AMS-Trocknungslauf mindestens zur Hälfte gelaufen ist. Für eine anderswo getrocknete Spule hier setzen.',
