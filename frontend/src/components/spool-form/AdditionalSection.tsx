@@ -180,6 +180,7 @@ export function AdditionalSection({
   onCreateLocation,
   globalLowStockThreshold,
   spoolmanMode = false,
+  hideMaterialNumber = false,
   showLastDried = false,
 }: AdditionalSectionProps) {
   const { t } = useTranslation();
@@ -322,10 +323,9 @@ export function AdditionalSection({
         </div>
       </div>
 
-      {/* Material number (#2870). Hidden in Spoolman mode: there the number
-          is Spoolman's filament-level article_number, maintained in Spoolman
-          itself and surfaced read-only in the list. */}
-      {!spoolmanMode && (
+      {/* Material number (#2870). In Spoolman mode it is the filament's
+          article_number, so saving the spool writes it to the filament. */}
+      {!hideMaterialNumber && (
         <div>
           <label className="block text-sm font-medium text-bambu-gray mb-1" htmlFor="spool-material-number">
             {t('inventory.materialNumber')}
@@ -345,7 +345,9 @@ export function AdditionalSection({
               {availableMaterialNumbers.map((n) => <option key={n} value={n} />)}
             </datalist>
           )}
-          <p className="text-xs text-bambu-gray mt-1">{t('inventory.materialNumberHelp')}</p>
+          <p className="text-xs text-bambu-gray mt-1">
+            {t(spoolmanMode ? 'inventory.materialNumberHelpSpoolman' : 'inventory.materialNumberHelp')}
+          </p>
         </div>
       )}
 

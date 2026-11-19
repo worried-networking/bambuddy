@@ -5389,6 +5389,7 @@ export default {
     materialNumber: 'Malzeme No.',
     materialNumberPlaceholder: 'örn. 15',
     materialNumberHelp: 'Dahili satın alma numarası - bu ürünün tüm makaraları tarafından paylaşılır. Aynı ürünün yeni makaraları bu numarayı devralır.',
+    materialNumberHelpSpoolman: 'Spoolman\'da filamentin ürün numarası olarak kaydedilir, bu yüzden bu filamentin tüm makaraları onu gösterir. Birden fazla numarayı virgülle ayırın.',
     lastDried: 'Son kurutma',
     lastDriedNow: 'Şimdi',
     lastDriedHelp: 'Süresinin en az yarısı kadar çalışan bir AMS kurutması bittiğinde doldurulur. Başka yerde kurutulan bir makara için buradan ayarlayın.',

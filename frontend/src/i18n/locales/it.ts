@@ -5388,6 +5388,7 @@ export default {
     materialNumber: 'N. materiale',
     materialNumberPlaceholder: 'es. 15',
     materialNumberHelp: 'Numero interno di acquisto - condiviso da tutte le bobine di questo prodotto. Le nuove bobine dello stesso prodotto lo ereditano.',
+    materialNumberHelpSpoolman: 'Salvato in Spoolman come numero articolo del filamento, quindi tutte le bobine di questo filamento lo mostrano. Separa più numeri con virgole.',
     lastDried: 'Ultima essiccazione',
     lastDriedNow: 'Ora',
     lastDriedHelp: 'Compilato quando termina un\'essiccazione AMS durata almeno metà del tempo previsto. Impostalo qui per una bobina essiccata altrove.',
