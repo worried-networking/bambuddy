@@ -526,3 +526,90 @@ class TestMaterialNumberCsv:
 
         listing = await async_client.get("/api/v1/inventory/spools")
         assert [s["material_number"] for s in listing.json()] == ["15"]
+
+
+class TestMaterialNumberSearch:
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    async def test_without_parameter_lists_all_spools(self, async_client: AsyncClient, spool_factory):
+        await spool_factory(material_number="15")
+        await spool_factory(material_number=None)
+
+        listing = await async_client.get("/api/v1/inventory/spools")
+        assert listing.status_code == 200
+        assert len(listing.json()) == 2
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    async def test_matches_whole_number(self, async_client: AsyncClient, spool_factory):
+        hit = await spool_factory(material_number="9319236810491")
+        await spool_factory(material_number="15")
+        await spool_factory(material_number=None)
+
+        resp = await async_client.get("/api/v1/inventory/spools", params={"material_number": "9319236810491"})
+        assert resp.status_code == 200
+        assert [s["id"] for s in resp.json()] == [hit.id]
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    async def test_matches_an_entry_of_a_list(self, async_client: AsyncClient, spool_factory):
+        comma = await spool_factory(material_number="15,9319236810491")
+        semicolon = await spool_factory(material_number="77 ; 9319236810491")
+        await spool_factory(material_number="15")
+
+        resp = await async_client.get("/api/v1/inventory/spools", params={"material_number": "9319236810491"})
+        assert sorted(s["id"] for s in resp.json()) == sorted([comma.id, semicolon.id])
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    async def test_no_substring_match(self, async_client: AsyncClient, spool_factory):
+        await spool_factory(material_number="9319236810491")
+
+        resp = await async_client.get("/api/v1/inventory/spools", params={"material_number": "931923681049"})
+        assert resp.status_code == 200
+        assert resp.json() == []
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    async def test_archived_left_out_unless_requested(self, async_client: AsyncClient, spool_factory):
+        from datetime import datetime, timezone
+
+        live = await spool_factory(material_number="15")
+        archived = await spool_factory(material_number="15", archived_at=datetime.now(timezone.utc))
+
+        resp = await async_client.get("/api/v1/inventory/spools", params={"material_number": "15"})
+        assert [s["id"] for s in resp.json()] == [live.id]
+
+        resp = await async_client.get(
+            "/api/v1/inventory/spools", params={"material_number": "15", "include_archived": "true"}
+        )
+        assert sorted(s["id"] for s in resp.json()) == sorted([live.id, archived.id])
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    async def test_empty_parameter_is_rejected(self, async_client: AsyncClient):
+        resp = await async_client.get("/api/v1/inventory/spools", params={"material_number": ""})
+        assert resp.status_code == 422
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    async def test_too_long_parameter_is_rejected(self, async_client: AsyncClient):
+        resp = await async_client.get("/api/v1/inventory/spools", params={"material_number": "9" * 65})
+        assert resp.status_code == 422
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    async def test_wildcards_are_literal(self, async_client: AsyncClient, spool_factory):
+        percent = await spool_factory(material_number="10%")
+        underscore = await spool_factory(material_number="A_1")
+        await spool_factory(material_number="105")
+        await spool_factory(material_number="AB1")
+
+        resp = await async_client.get("/api/v1/inventory/spools", params={"material_number": "10%"})
+        assert [s["id"] for s in resp.json()] == [percent.id]
+
+        resp = await async_client.get("/api/v1/inventory/spools", params={"material_number": "A_1"})
+        assert [s["id"] for s in resp.json()] == [underscore.id]
+
+        resp = await async_client.get("/api/v1/inventory/spools", params={"material_number": "%"})
+        assert resp.json() == []

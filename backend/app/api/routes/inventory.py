@@ -84,7 +84,7 @@ from backend.app.services.location_service import (
     prepare_internal_spool_payload,
     rename_location as rename_location_record,
 )
-from backend.app.services.material_number import apply_material_number_inheritance
+from backend.app.services.material_number import apply_material_number_inheritance, material_number_matches
 from backend.app.services.slicer_filament_resolver import resolve_slicer_filament, reusable_slot_filament_id
 from backend.app.services.slot_nozzle import resolve_slot_nozzle
 from backend.app.services.spool_csv import (
@@ -1454,16 +1454,26 @@ async def sync_from_filamentcolors(
 @router.get("/spools", response_model=list[SpoolResponse])
 async def list_spools(
     include_archived: bool = False,
+    material_number: str | None = Query(None, min_length=1, max_length=64),
     db: AsyncSession = Depends(get_db, scope="function"),
     _: User | None = RequirePermissionIfAuthEnabled(Permission.INVENTORY_READ),
 ):
-    """List all spools, excluding archived by default."""
+    """List all spools, excluding archived by default.
+
+    ``material_number`` keeps the spools whose material number is, or lists, that number.
+    """
     query = select(Spool).options(*spool_response_loads())
     if not include_archived:
         query = query.where(Spool.archived_at.is_(None))
+    if material_number is not None:
+        # The SQL pre-filter only narrows the rows; the exact rule is the function's.
+        query = query.where(Spool.material_number.contains(material_number.strip(), autoescape=True))
     query = query.order_by(Spool.material, Spool.brand, Spool.color_name)
     result = await db.execute(query)
-    return list(result.scalars().all())
+    spools = list(result.scalars().all())
+    if material_number is not None:
+        spools = [s for s in spools if material_number_matches(s.material_number, material_number)]
+    return spools
 
 
 # ── CSV import / export (#1576) ──────────────────────────────────────────────
