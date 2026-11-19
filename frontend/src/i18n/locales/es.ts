@@ -5367,6 +5367,7 @@ export default {
     materialNumber: 'N.º de material',
     materialNumberPlaceholder: 'p. ej. 15',
     materialNumberHelp: 'Número interno de compras: compartido por todas las bobinas de este producto. Las bobinas nuevas del mismo producto lo heredan.',
+    materialNumberHelpSpoolman: 'Se guarda en Spoolman como número de artículo del filamento, así que todas las bobinas de este filamento lo muestran. Separa varios números con comas.',
     lastDried: 'Último secado',
     lastDriedNow: 'Ahora',
     lastDriedHelp: 'Se rellena cuando termina un secado en el AMS que ha durado al menos la mitad de su duración. Indícalo aquí para una bobina secada en otro sitio.',

@@ -138,4 +138,30 @@ describe('InventoryPage material-number filter', () => {
 
     await waitFor(() => expect(rowBrands()).toEqual(['BetaBrand', 'AlphaBrand']));
   });
+
+  it('lists each entry of a multi-number spool once and filters by entry', async () => {
+    server.use(
+      http.get('/api/v1/inventory/spools', () =>
+        HttpResponse.json([
+          { ...BASE, id: 1, brand: 'AlphaBrand', material_number: 'a,b' },
+          { ...BASE, id: 2, brand: 'BetaBrand', material_number: 'b; c' },
+        ])
+      ),
+    );
+    render(<InventoryPageRouter />);
+    const select = await materialNumberSelect();
+    await waitFor(() => expect(rowBrands()).toEqual(['AlphaBrand', 'BetaBrand']));
+
+    const values = Array.from(select.options).map((o) => o.value).filter((v) => v && v.length < 64);
+    expect(values).toEqual(['a', 'b', 'c']);
+
+    fireEvent.change(select, { target: { value: 'a' } });
+    await waitFor(() => expect(rowBrands()).toEqual(['AlphaBrand']));
+
+    fireEvent.change(select, { target: { value: 'b' } });
+    await waitFor(() => expect(rowBrands()).toEqual(['AlphaBrand', 'BetaBrand']));
+
+    fireEvent.change(select, { target: { value: 'c' } });
+    await waitFor(() => expect(rowBrands()).toEqual(['BetaBrand']));
+  });
 });

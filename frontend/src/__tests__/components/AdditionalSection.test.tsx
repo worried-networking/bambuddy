@@ -33,11 +33,17 @@ describe('AdditionalSection', () => {
     expect(screen.getByText('inventory.materialNumber')).toBeTruthy();
   });
 
-  it('hides the material number field in Spoolman mode (#2870)', () => {
-    // In Spoolman mode the number is the filament-level article_number,
-    // maintained in Spoolman itself — the form must not offer an input
-    // whose value would be silently dropped.
+  it('renders the material number field in Spoolman mode with the Spoolman help text', () => {
+    // In Spoolman mode the number is the filament's article number: the form
+    // edits it and the save writes it to the filament.
     render(<AdditionalSection {...baseProps} spoolmanMode={true} />);
-    expect(screen.queryByText('inventory.materialNumber')).toBeNull();
+    expect(screen.getByLabelText('inventory.materialNumber')).toBeTruthy();
+    expect(screen.getByText('inventory.materialNumberHelpSpoolman')).toBeTruthy();
+    expect(screen.queryByText('inventory.materialNumberHelp')).toBeNull();
+  });
+
+  it('hides the material number field when the form cannot save it', () => {
+    render(<AdditionalSection {...baseProps} spoolmanMode={true} hideMaterialNumber />);
+    expect(screen.queryByLabelText('inventory.materialNumber')).toBeNull();
   });
 });
