@@ -5389,6 +5389,7 @@ export default {
     materialNumberPlaceholder: 'ex. 15',
     materialNumberHelp: 'Número interno de compra - compartilhado por todos os carretéis deste produto. Novos carretéis do mesmo produto o herdam.',
     materialNumberHelpSpoolman: 'Salvo no Spoolman como o número de artigo do filamento, então todos os carretéis deste filamento o mostram. Separe vários números com vírgulas.',
+    materialNumberNotSaved: 'Carretel criado, mas o número do material não foi salvo',
     lastDried: 'Última secagem',
     lastDriedNow: 'Agora',
     lastDriedHelp: 'Preenchido quando termina uma secagem no AMS que durou pelo menos metade do tempo previsto. Defina aqui para um carretel secado em outro lugar.',

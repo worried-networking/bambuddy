@@ -88,7 +88,24 @@ async def _ids(async_client: AsyncClient, **params) -> list[int]:
 @pytest.mark.asyncio
 @pytest.mark.integration
 async def test_without_parameter_lists_all_unarchived(async_client, spoolman_settings, mock_spoolman_client):
-    assert await _ids(async_client) == [1, 2, 3, 4, 5, 6, 7]
+    resp = await async_client.get(URL)
+    assert resp.status_code == 200
+    rows = resp.json()
+    # Spoolman order is kept; the archived spool 8 is left out.
+    assert [(s["id"], s["spoolman_filament_id"], s["material_number"]) for s in rows] == [
+        (1, 10, "9319236810491"),
+        (2, 10, "9319236810491"),
+        (3, 11, "15, 9319236810492 ;77"),
+        (4, 12, None),
+        (5, 13, None),
+        (6, 14, "10%"),
+        (7, 15, "PM 70820"),
+    ]
+    # Every row has the mapped shape and nothing else.
+    from backend.app.api.routes._spoolman_helpers import MappedSpoolFields
+
+    for row in rows:
+        assert set(MappedSpoolFields.__annotations__) <= set(row)
 
 
 @pytest.mark.asyncio
@@ -303,3 +320,25 @@ class TestFilamentMaterialNumber:
         filament_client.patch_filament.side_effect = SpoolmanUnavailableError("down")
         resp = await async_client.patch(f"{FILAMENT_URL}/7", json={"material_number": "5"})
         assert resp.status_code == 503
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    async def test_patch_broadcasts_inventory_changed(self, async_client, spoolman_settings, filament_client):
+        # Open Inventory pages refetch on this, like after a spool write.
+        with patch("backend.app.api.routes.spoolman_inventory.ws_manager") as mock_ws:
+            mock_ws.broadcast = AsyncMock()
+            resp = await async_client.patch(f"{FILAMENT_URL}/7", json={"material_number": "5"})
+        assert resp.status_code == 200
+        mock_ws.broadcast.assert_awaited_once_with({"type": "inventory_changed"})
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    async def test_failed_patch_does_not_broadcast(self, async_client, spoolman_settings, filament_client):
+        from backend.app.services.spoolman import SpoolmanUnavailableError
+
+        filament_client.patch_filament.side_effect = SpoolmanUnavailableError("down")
+        with patch("backend.app.api.routes.spoolman_inventory.ws_manager") as mock_ws:
+            mock_ws.broadcast = AsyncMock()
+            resp = await async_client.patch(f"{FILAMENT_URL}/7", json={"material_number": "5"})
+        assert resp.status_code == 503
+        mock_ws.broadcast.assert_not_called()

@@ -5444,6 +5444,7 @@ export default {
     materialNumberPlaceholder: 'np. 15',
     materialNumberHelp: 'Wewnętrzny numer zakupowy — wspólny dla wszystkich szpul tego produktu. Nowe szpule tego samego produktu go dziedziczą.',
     materialNumberHelpSpoolman: 'Zapisywany w Spoolman jako numer artykułu filamentu, więc widzi go każda szpula tego filamentu. Kilka numerów oddziel przecinkami.',
+    materialNumberNotSaved: 'Szpula utworzona, ale numer materiałowy nie został zapisany',
     lastDried: 'Ostatnie suszenie',
     lastDriedNow: 'Teraz',
     lastDriedHelp: 'Uzupełniane po zakończeniu suszenia w AMS trwającego co najmniej połowę zaplanowanego czasu. Ustaw tutaj dla szpuli suszonej gdzie indziej.',
