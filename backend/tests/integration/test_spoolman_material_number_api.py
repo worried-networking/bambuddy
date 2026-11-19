@@ -159,3 +159,147 @@ async def test_mapped_spools_carry_the_filament_id(async_client, spoolman_settin
         6: 14,
         7: 15,
     }
+
+
+FILAMENT_URL = "/api/v1/spoolman/inventory/filaments"
+
+
+def _filament(**extra) -> dict:
+    return {
+        "id": 7,
+        "name": "PLA Basic",
+        "material": "PLA",
+        "color_hex": "FF0000",
+        "weight": 1000,
+        "spool_weight": 250.0,
+        "vendor": {"id": 3, "name": "Bambu Lab"},
+        **extra,
+    }
+
+
+@pytest.fixture
+def filament_client():
+    client = MagicMock()
+    client.base_url = "http://localhost:7912"
+    client.get_filament = AsyncMock(return_value=_filament())
+    client.patch_filament = AsyncMock(side_effect=lambda fid, data: _filament(**data))
+    client.get_filaments = AsyncMock(return_value=[])
+    client.get_all_spools = AsyncMock(return_value=[])
+    client.update_spool_full = AsyncMock(return_value={})
+    with patch("backend.app.api.routes.spoolman_inventory._get_client", AsyncMock(return_value=client)):
+        yield client
+
+
+class TestFilamentMaterialNumber:
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    async def test_filaments_list_has_material_number(self, async_client, spoolman_settings, filament_client):
+        filament_client.get_filaments.return_value = [
+            _filament(id=1, article_number="  9319236810491 "),
+            _filament(id=2, article_number="   "),
+            _filament(id=3),
+        ]
+        resp = await async_client.get(FILAMENT_URL)
+        assert resp.status_code == 200
+        assert {f["id"]: f["material_number"] for f in resp.json()} == {1: "9319236810491", 2: None, 3: None}
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    async def test_patch_sends_article_number(self, async_client, spoolman_settings, filament_client):
+        resp = await async_client.patch(f"{FILAMENT_URL}/7", json={"material_number": "a,b"})
+        assert resp.status_code == 200
+        filament_client.patch_filament.assert_called_once_with(7, {"article_number": "a,b"})
+        assert resp.json()["material_number"] == "a,b"
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    async def test_patch_trims_the_value(self, async_client, spoolman_settings, filament_client):
+        resp = await async_client.patch(f"{FILAMENT_URL}/7", json={"material_number": "  15  "})
+        assert resp.status_code == 200
+        filament_client.patch_filament.assert_called_once_with(7, {"article_number": "15"})
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    async def test_patch_blank_clears(self, async_client, spoolman_settings, filament_client):
+        resp = await async_client.patch(f"{FILAMENT_URL}/7", json={"material_number": "  "})
+        assert resp.status_code == 200
+        filament_client.patch_filament.assert_called_once_with(7, {"article_number": None})
+        assert resp.json()["material_number"] is None
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    async def test_patch_explicit_null_clears(self, async_client, spoolman_settings, filament_client):
+        resp = await async_client.patch(f"{FILAMENT_URL}/7", json={"material_number": None})
+        assert resp.status_code == 200
+        filament_client.patch_filament.assert_called_once_with(7, {"article_number": None})
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    async def test_patch_without_field_sends_no_article_number(self, async_client, spoolman_settings, filament_client):
+        resp = await async_client.patch(f"{FILAMENT_URL}/7", json={"name": "PLA Matte"})
+        assert resp.status_code == 200
+        filament_client.patch_filament.assert_called_once_with(7, {"name": "PLA Matte"})
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    async def test_patch_too_long_is_rejected(self, async_client, spoolman_settings, filament_client):
+        resp = await async_client.patch(f"{FILAMENT_URL}/7", json={"material_number": "9" * 65})
+        assert resp.status_code == 422
+        filament_client.patch_filament.assert_not_called()
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    async def test_padded_value_is_held_to_64_after_trim(self, async_client, spoolman_settings, filament_client):
+        resp = await async_client.patch(f"{FILAMENT_URL}/7", json={"material_number": " " + "9" * 64 + " "})
+        assert resp.status_code == 200
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    async def test_weight_patch_does_not_touch_the_number(self, async_client, spoolman_settings, filament_client):
+        resp = await async_client.patch(f"{FILAMENT_URL}/7", json={"spool_weight": 196.0})
+        assert resp.status_code == 200
+        filament_client.patch_filament.assert_called_once_with(7, {"spool_weight": 196.0})
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    async def test_number_with_weight_stamps_spools_as_before(self, async_client, spoolman_settings, filament_client):
+        filament_client.get_all_spools.return_value = [{"id": 42, "spool_weight": None, "filament": {"id": 7}}]
+        resp = await async_client.patch(f"{FILAMENT_URL}/7", json={"material_number": "5", "spool_weight": 196.0})
+        assert resp.status_code == 200
+        filament_client.patch_filament.assert_called_once_with(7, {"article_number": "5", "spool_weight": 196.0})
+        filament_client.update_spool_full.assert_called_once_with(spool_id=42, spool_weight=196.0)
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    async def test_number_alone_does_not_restamp_spools(self, async_client, spoolman_settings, filament_client):
+        resp = await async_client.patch(f"{FILAMENT_URL}/7", json={"material_number": "5"})
+        assert resp.status_code == 200
+        filament_client.get_all_spools.assert_not_called()
+        filament_client.update_spool_full.assert_not_called()
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    async def test_spoolman_404_maps_to_404(self, async_client, spoolman_settings, filament_client):
+        from backend.app.services.spoolman import SpoolmanNotFoundError
+
+        filament_client.get_filament.side_effect = SpoolmanNotFoundError("gone")
+        resp = await async_client.patch(f"{FILAMENT_URL}/7", json={"material_number": "5"})
+        assert resp.status_code == 404
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    async def test_spoolman_5xx_maps_to_502(self, async_client, spoolman_settings, filament_client):
+        from backend.app.services.spoolman import SpoolmanClientError
+
+        filament_client.patch_filament.side_effect = SpoolmanClientError("boom", status_code=500)
+        resp = await async_client.patch(f"{FILAMENT_URL}/7", json={"material_number": "5"})
+        assert resp.status_code == 502
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    async def test_spoolman_unreachable_maps_to_503(self, async_client, spoolman_settings, filament_client):
+        from backend.app.services.spoolman import SpoolmanUnavailableError
+
+        filament_client.patch_filament.side_effect = SpoolmanUnavailableError("down")
+        resp = await async_client.patch(f"{FILAMENT_URL}/7", json={"material_number": "5"})
+        assert resp.status_code == 503

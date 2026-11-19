@@ -93,6 +93,7 @@ class NormalizedFilament(TypedDict):
     color_name: str | None
     weight: int | None
     spool_weight: float | None
+    material_number: str | None
     vendor: NormalizedVendorRef | None
 
 
