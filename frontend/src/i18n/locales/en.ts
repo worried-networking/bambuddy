@@ -5360,6 +5360,7 @@ export default {
     materialNumber: 'Material No.',
     materialNumberPlaceholder: 'e.g. 15',
     materialNumberHelp: 'Internal purchasing number — shared by all spools of this product. New spools of the same product inherit it.',
+    materialNumberHelpSpoolman: 'Saved as the filament\'s article number in Spoolman, so every spool of this filament shows it. Separate several numbers with commas.',
     lastDried: 'Last dried',
     lastDriedNow: 'Now',
     lastDriedHelp: 'Filled in when an AMS drying run of at least half its length ends. Set it here for a spool dried elsewhere.',

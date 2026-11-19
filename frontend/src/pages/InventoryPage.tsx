@@ -39,6 +39,7 @@ import {
   invalidateSpoolAndLocationQueries,
 } from '../utils/inventoryQueries';
 import { aggregateGroupSpool } from '../utils/inventoryGrouping';
+import { splitMaterialNumbers } from '../utils/materialNumber';
 import {
   locationSensorReadingAlertStatus,
   locationSensorValueColorClass,
@@ -1382,9 +1383,9 @@ function InventoryPage({ spoolmanMode = false, spoolmanModeReady = true }: { spo
     // no number assigned yet.
     if (materialNumberFilter) {
       if (materialNumberFilter === MATERIAL_NUMBER_NONE) {
-        filtered = filtered.filter((s) => !s.material_number?.trim());
+        filtered = filtered.filter((s) => splitMaterialNumbers(s.material_number).length === 0);
       } else {
-        filtered = filtered.filter((s) => s.material_number === materialNumberFilter);
+        filtered = filtered.filter((s) => splitMaterialNumbers(s.material_number).includes(materialNumberFilter));
       }
     }
 
@@ -1457,9 +1458,10 @@ function InventoryPage({ spoolmanMode = false, spoolmanModeReady = true }: { spo
   const uniqueCategories = [...new Set(spools?.map((s) => s.category?.trim()).filter(Boolean) as string[] || [])].sort();
   const hasUncategorized = (spools ?? []).some((s) => !s.category);
   // #2870: distinct material numbers, numeric-aware sort ("2" before "15").
-  const uniqueMaterialNumbers = [...new Set(spools?.map((s) => s.material_number?.trim()).filter(Boolean) as string[] || [])]
+  // A spool with several numbers ("a,b") offers each entry.
+  const uniqueMaterialNumbers = [...new Set((spools ?? []).flatMap((s) => splitMaterialNumbers(s.material_number)))]
     .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
-  const hasUnnumbered = (spools ?? []).some((s) => !s.material_number?.trim());
+  const hasUnnumbered = (spools ?? []).some((s) => splitMaterialNumbers(s.material_number).length === 0);
   // #2988: suppliers seen across the inventory, for the filter dropdown.
   const uniqueSuppliers = useMemo(() => {
     const byId = new Map<number, string>();
@@ -2673,7 +2675,7 @@ function InventoryPage({ spoolmanMode = false, spoolmanModeReady = true }: { spo
         availableSubtypes={dedupeAndSort((spools ?? []).map((s) => s.subtype))}
         availableBrands={dedupeAndSort((spools ?? []).map((s) => s.brand))}
         availableCategories={dedupeAndSort((spools ?? []).map((s) => s.category))}
-        availableMaterialNumbers={dedupeAndSort((spools ?? []).map((s) => s.material_number))}
+        availableMaterialNumbers={dedupeAndSort((spools ?? []).flatMap((s) => splitMaterialNumbers(s.material_number)))}
         availableSlicerFilaments={dedupeAndSort((spools ?? []).map((s) => s.slicer_filament))}
         availableSlicerFilamentNames={dedupeAndSort((spools ?? []).map((s) => s.slicer_filament_name))}
         spoolmanMode={spoolmanMode}

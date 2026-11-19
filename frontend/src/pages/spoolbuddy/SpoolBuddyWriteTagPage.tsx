@@ -1069,6 +1069,8 @@ function NewSpoolTouchForm({ currencySymbol, onCreated, selectedSpool, spoolmanM
               )).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))}
               globalLowStockThreshold={settingsForForm?.low_stock_threshold ?? 20}
               spoolmanMode={spoolmanMode}
+              // This form creates the spool only; the Spoolman number is edited in the inventory.
+              hideMaterialNumber={spoolmanMode}
             />
           </div>
         ) : (

@@ -26,6 +26,7 @@ import { PrinterProfilesSection } from './spool-form/PrinterProfilesSection';
 import { ProfileDefaultOption, type ProfileDefaultScope } from './spool-form/ProfileDefaultOption';
 import { normaliseFlow } from '../utils/nozzleFlow';
 import { parseUTCDate, toDateTimeLocalValue } from '../utils/date';
+import { splitMaterialNumbers } from '../utils/materialNumber';
 import { SpoolUsageHistory } from './SpoolUsageHistory';
 import { AssignToAmsModal } from './spoolbuddy/AssignToAmsModal';
 import {
@@ -731,6 +732,29 @@ export function SpoolFormModal({
     setRecentColors(prev => saveRecentColor(color, prev));
   };
 
+  // Spoolman mode: the material number is the filament's article number, not a
+  // field of the spool, so a changed number goes to the filament the saved
+  // spool belongs to, named by the save response. False when it was not saved.
+  const saveFilamentMaterialNumber = async (saved: InventorySpool | undefined): Promise<boolean> => {
+    if (!spoolmanMode) return true;
+    const next = formData.material_number.trim() || null;
+    if (next === (spool?.material_number?.trim() || null)) return true;
+    if (!saved?.spoolman_filament_id) {
+      showToast(t('inventory.saveFailed'), 'error');
+      return false;
+    }
+    try {
+      await api.updateSpoolmanInventoryFilament(saved.spoolman_filament_id, { material_number: next });
+      return true;
+    } catch (error) {
+      showToast(
+        error instanceof ApiError && error.status === 503 ? t('inventory.spoolmanUnreachable') : t('inventory.saveFailed'),
+        'error',
+      );
+      return false;
+    }
+  };
+
   // Mutations – dispatch to Spoolman proxy or local inventory based on mode
   const createMutation = useMutation({
     mutationFn: (data: Record<string, unknown>) =>
@@ -738,6 +762,7 @@ export function SpoolFormModal({
         ? api.createSpoolmanInventorySpool(data as Parameters<typeof api.createSpoolmanInventorySpool>[0])
         : api.createSpool(data as Parameters<typeof api.createSpool>[0]),
     onSuccess: async (newSpool) => {
+      if (!(await saveFilamentMaterialNumber(newSpool))) return;
       if (newSpool?.id) {
         const ok = await savePrinterProfiles(newSpool.id);
         if (!ok) return;
@@ -778,6 +803,9 @@ export function SpoolFormModal({
       const createdSpools: InventorySpool[] = spoolmanResult
         ? spoolmanResult.created
         : (result as InventorySpool[]);
+
+      // Every copy belongs to the same filament, so one write covers them all.
+      if (createdSpools.length > 0 && !(await saveFilamentMaterialNumber(createdSpools[0]))) return;
 
       // Bulk create: every copy gets the same profiles and overrides. A no-op
       // when the user left the Printers tab alone (savePrinterProfiles), so a
@@ -822,7 +850,8 @@ export function SpoolFormModal({
       spoolmanMode
         ? api.updateSpoolmanInventorySpool(spool!.id, data as Parameters<typeof api.updateSpoolmanInventorySpool>[1])
         : api.updateSpool(spool!.id, data as Parameters<typeof api.updateSpool>[1]),
-    onSuccess: async () => {
+    onSuccess: async (updated) => {
+      if (!(await saveFilamentMaterialNumber(updated))) return;
       if (spool?.id) {
         const ok = await savePrinterProfiles(spool.id);
         if (!ok) return;
@@ -920,8 +949,7 @@ export function SpoolFormModal({
   const availableMaterialNumbers = (() => {
     const set = new Set<string>();
     for (const s of allSpools ?? []) {
-      const n = s.material_number?.trim();
-      if (n) set.add(n);
+      for (const n of splitMaterialNumbers(s.material_number)) set.add(n);
     }
     return Array.from(set).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
   })();

@@ -226,10 +226,11 @@ export interface AdditionalSectionProps extends SectionProps {
   // When true the "Last dried" field is shown. Edit mode only: a new spool
   // has no drying record to correct (#2863).
   showLastDried?: boolean;
-  // When true the material number input is hidden: in Spoolman mode the
-  // number is Spoolman's filament-level article_number, maintained in
-  // Spoolman itself and shown read-only in the list (#2870).
+  // Spoolman mode: the material number is the filament's article_number
+  // (#2870), and the help text says so.
   spoolmanMode?: boolean;
+  // Hide the material number input. For a form whose save cannot write it.
+  hideMaterialNumber?: boolean;
 }
 
 // PA Profile section props

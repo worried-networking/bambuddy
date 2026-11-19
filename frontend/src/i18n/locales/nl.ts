@@ -5358,6 +5358,7 @@ export default {
     materialNumber: 'Materiaalnr.',
     materialNumberPlaceholder: 'bijv. 15',
     materialNumberHelp: 'Intern inkoopnummer - gedeeld door alle spoelen van dit product. Nieuwe spoelen van hetzelfde product nemen het over.',
+    materialNumberHelpSpoolman: 'Wordt in Spoolman opgeslagen als artikelnummer van het filament, dus elke spoel van dit filament toont het. Scheid meerdere nummers met komma\'s.',
     lastDried: 'Laatst gedroogd',
     lastDriedNow: 'Nu',
     lastDriedHelp: 'Wordt ingevuld wanneer een AMS-droogcyclus van minstens de helft van zijn duur eindigt. Stel het hier in voor een elders gedroogde spoel.',

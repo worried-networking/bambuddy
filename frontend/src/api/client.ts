@@ -3950,6 +3950,8 @@ export interface SpoolmanFilamentEntry {
   weight: number | null;
   spool_weight: number | null;
   vendor: SpoolmanVendor | null;
+  // The filament's article number: one number, or several separated by commas.
+  material_number: string | null;
 }
 
 // Inventory types
@@ -4098,6 +4100,8 @@ export interface InventorySpool {
   // Internal material / article number (#2870) — the purchasing identifier
   // shared by all spools of the same product.
   material_number: string | null;
+  // Spoolman mode: the id of the filament that holds the number.
+  spoolman_filament_id?: number | null;
   k_profiles?: SpoolKProfile[];
   storage_location?: string | null;
   location_id?: number | null;
@@ -7582,6 +7586,12 @@ export const api = {
     data: Partial<Omit<InventorySpool, 'id' | 'archived_at' | 'created_at' | 'updated_at' | 'k_profiles'>>,
   ) =>
     request<InventorySpool>(`/spoolman/inventory/spools/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+  // Only the material number: it is written to the filament's article number.
+  updateSpoolmanInventoryFilament: (id: number, data: { material_number: string | null }) =>
+    request<SpoolmanFilamentEntry>(`/spoolman/inventory/filaments/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
     }),
