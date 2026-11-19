@@ -1,7 +1,8 @@
 from typing import Annotated
 
-from pydantic import AfterValidator, BaseModel, Field, model_validator
+from pydantic import AfterValidator, BaseModel, Field, field_validator, model_validator
 
+from backend.app.schemas.spool import normalize_material_number
 from backend.app.utils.tray_ids import AMS3H_UNIT_ID, EXTERNAL_AMS_ID
 
 
@@ -33,7 +34,16 @@ def check_slot_tray_id(ams_id: int | None, tray_id: int | None) -> None:
 class SpoolmanFilamentPatch(BaseModel):
     name: str | None = Field(None, min_length=1, max_length=200)
     spool_weight: float | None = Field(None, ge=0.0, le=10_000.0)
+    # Stored as Spoolman's filament.article_number. An explicit null clears it.
+    material_number: str | None = Field(None, max_length=64)
     keep_existing_spools: bool = False
+
+    # mode="before": trim first, so a padded value is held to the 64
+    # characters it will store, not to the length it arrived with.
+    @field_validator("material_number", mode="before")
+    @classmethod
+    def _validate_material_number(cls, v):
+        return normalize_material_number(v) if isinstance(v, str) else v
 
     @model_validator(mode="after")
     def keep_existing_requires_weight(self) -> "SpoolmanFilamentPatch":

@@ -2606,6 +2606,7 @@ def _normalize_filament(raw: dict) -> NormalizedFilament | None:
         color_name=raw.get("color_name") or None,
         weight=_safe_int(raw.get("weight"), 0) or None,  # 0g is not a valid weight
         spool_weight=_safe_optional_float(raw.get("spool_weight")),
+        material_number=str(raw.get("article_number") or "").strip() or None,
         vendor=vendor_ref,
     )
 
@@ -2633,7 +2634,7 @@ async def patch_spoolman_filament(
     db: AsyncSession = Depends(get_db, scope="function"),
     _: User | None = RequirePermissionIfAuthEnabled(Permission.INVENTORY_UPDATE),
 ) -> NormalizedFilament:
-    """Update a Spoolman filament's name and/or spool_weight.
+    """Update a Spoolman filament's name, spool_weight and/or material number.
 
     When spool_weight changes, Option A (keep_existing_spools=True) stamps the old
     weight (the filament's, or its vendor's empty_spool_weight when the filament had
@@ -2649,6 +2650,9 @@ async def patch_spoolman_filament(
         current = await client.get_filament(filament_id)
 
     patch_data = {k: v for k, v in body.model_dump(exclude_unset=True).items() if k != "keep_existing_spools"}
+    if "material_number" in patch_data:
+        # Spoolman stores the material number as the filament's article_number.
+        patch_data["article_number"] = patch_data.pop("material_number")
     if not patch_data:
         normalized = _normalize_filament(current)
         if normalized is None:
