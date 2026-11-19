@@ -2710,6 +2710,9 @@ async def patch_spoolman_filament(
     normalized = _normalize_filament(updated)
     if normalized is None:
         raise HTTPException(status_code=502, detail="Spoolman returned malformed filament data")
+    # The filament's fields show on every spool row (the material number among
+    # them), so open Inventory pages refetch like they do after a spool write.
+    await ws_manager.broadcast({"type": "inventory_changed"})
     return normalized
 
 

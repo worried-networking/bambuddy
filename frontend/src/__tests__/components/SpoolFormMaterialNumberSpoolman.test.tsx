@@ -71,7 +71,8 @@ vi.mock('../../contexts/ToastContext', async (importOriginal) => {
   };
 });
 
-import { api } from '../../api/client';
+import { api, ApiError } from '../../api/client';
+import type { SpoolmanFilamentEntry } from '../../api/client';
 
 const spoolmanSpool = {
   id: 42,
@@ -164,5 +165,144 @@ describe('SpoolFormModal material number in Spoolman mode', () => {
 
     await waitFor(() => expect(mockShowToast).toHaveBeenCalledWith(expect.any(String), 'error'));
     expect(api.updateSpoolmanInventoryFilament).not.toHaveBeenCalled();
+  });
+
+  it('merges the new entries into the numbers the filament has now when the save resolved to another filament', async () => {
+    // The response shows 9319236810491 on the filament; the spool came with 15.
+    // Replacing the filament's text with the field's would drop the barcode.
+    vi.mocked(api.updateSpoolmanInventorySpool).mockResolvedValueOnce({
+      id: 42,
+      spoolman_filament_id: 9,
+      material_number: '9319236810491',
+    } as InventorySpool);
+    renderEdit();
+    await openColorAndCost();
+
+    fireEvent.change(screen.getByLabelText('Material No.'), { target: { value: '15,9319236810491,PM 70820' } });
+    fireEvent.click(screen.getByRole('button', { name: /save/i }));
+
+    await waitFor(() => expect(api.updateSpoolmanInventoryFilament).toHaveBeenCalledTimes(1));
+    expect(api.updateSpoolmanInventoryFilament).toHaveBeenCalledWith(9, { material_number: '9319236810491,15,PM 70820' });
+  });
+
+  it('sends no PATCH after a filament change in edit mode when the field is untouched', async () => {
+    vi.mocked(api.updateSpoolmanInventorySpool).mockResolvedValueOnce({
+      id: 42,
+      spoolman_filament_id: 9,
+      material_number: '9319236810491',
+    } as InventorySpool);
+    renderEdit();
+    await openColorAndCost();
+
+    fireEvent.click(screen.getByRole('button', { name: /save/i }));
+
+    await waitFor(() => expect(mockShowToast).toHaveBeenCalledWith('Spool updated', 'success'));
+    expect(api.updateSpoolmanInventoryFilament).not.toHaveBeenCalled();
+  });
+});
+
+const catalogFilament = {
+  id: 7,
+  name: 'PLA Basic Black',
+  material: 'PLA',
+  color_hex: '000000',
+  color_name: 'Black',
+  weight: 1000,
+  spool_weight: 250,
+  vendor: { id: 1, name: 'BrandX' },
+  material_number: '9319236810491',
+} as unknown as SpoolmanFilamentEntry;
+
+async function pickCatalogFilament() {
+  vi.mocked(api.getSpoolmanInventoryFilaments).mockResolvedValue([catalogFilament]);
+  render(
+    <SpoolFormModal isOpen={true} onClose={vi.fn()} mode="create" currencySymbol="$" spoolmanMode={true} />,
+  );
+  await waitFor(() => expect(screen.getByRole('heading', { name: 'Add Spool' })).toBeInTheDocument());
+  fireEvent.click(screen.getByText('Spoolman Filament Catalog'));
+  fireEvent.click(await screen.findByText('BrandX — PLA Basic Black'));
+  fireEvent.click(screen.getByText('Color & Cost'));
+}
+
+function submitCreate() {
+  const addButtons = screen.getAllByRole('button', { name: /add spool/i });
+  const submit = addButtons.find((btn) => btn.querySelector('svg.lucide-save'));
+  expect(submit).toBeTruthy();
+  fireEvent.click(submit!);
+}
+
+describe('SpoolFormModal material number after a catalog pick', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(api.createSpoolmanInventorySpool).mockResolvedValue({ id: 88, spoolman_filament_id: 7 } as InventorySpool);
+  });
+
+  it('prefills the picked filament number and sends no PATCH when it is left alone', async () => {
+    await pickCatalogFilament();
+    expect(screen.getByLabelText('Material No.')).toHaveValue('9319236810491');
+
+    submitCreate();
+
+    await waitFor(() => expect(mockShowToast).toHaveBeenCalledWith('Spool created', 'success'));
+    expect(api.updateSpoolmanInventoryFilament).not.toHaveBeenCalled();
+  });
+
+  it('keeps the barcode entry when another number is added to the prefilled field', async () => {
+    await pickCatalogFilament();
+
+    fireEvent.change(screen.getByLabelText('Material No.'), { target: { value: '9319236810491,PM 70820' } });
+    submitCreate();
+
+    await waitFor(() => expect(api.updateSpoolmanInventoryFilament).toHaveBeenCalledTimes(1));
+    expect(api.updateSpoolmanInventoryFilament).toHaveBeenCalledWith(7, { material_number: '9319236810491,PM 70820' });
+  });
+
+  it('closes with a warning when the number write fails after a create', async () => {
+    vi.mocked(api.updateSpoolmanInventoryFilament).mockRejectedValueOnce(new ApiError('down', 503));
+    const onClose = vi.fn();
+    vi.mocked(api.getSpoolmanInventoryFilaments).mockResolvedValue([catalogFilament]);
+    render(
+      <SpoolFormModal isOpen={true} onClose={onClose} mode="create" currencySymbol="$" spoolmanMode={true} />,
+    );
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Add Spool' })).toBeInTheDocument());
+    fireEvent.click(screen.getByText('Spoolman Filament Catalog'));
+    fireEvent.click(await screen.findByText('BrandX — PLA Basic Black'));
+    fireEvent.click(screen.getByText('Color & Cost'));
+    fireEvent.change(screen.getByLabelText('Material No.'), { target: { value: 'PM 70820' } });
+    submitCreate();
+
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+    expect(mockShowToast).toHaveBeenCalledWith(expect.stringContaining('material number'), 'warning');
+    expect(mockShowToast).not.toHaveBeenCalledWith(expect.any(String), 'error');
+    expect(api.createSpoolmanInventorySpool).toHaveBeenCalledTimes(1);
+  });
+
+  it('closes with a warning when the number write fails after a bulk create', async () => {
+    vi.mocked(api.updateSpoolmanInventoryFilament).mockRejectedValueOnce(new ApiError('boom', 500));
+    vi.mocked(api.bulkCreateSpoolmanInventorySpools).mockResolvedValueOnce({
+      created: [{ id: 1, spoolman_filament_id: 7 } as InventorySpool, { id: 2, spoolman_filament_id: 7 } as InventorySpool],
+      requested_count: 2,
+      failed_count: 0,
+    });
+    const onClose = vi.fn();
+    vi.mocked(api.getSpoolmanInventoryFilaments).mockResolvedValue([catalogFilament]);
+    render(
+      <SpoolFormModal isOpen={true} onClose={onClose} mode="create" currencySymbol="$" spoolmanMode={true} />,
+    );
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Add Spool' })).toBeInTheDocument());
+    fireEvent.click(screen.getByText('Spoolman Filament Catalog'));
+    fireEvent.click(await screen.findByText('BrandX — PLA Basic Black'));
+    // The tabs are hidden in Quick Add, so set the number first.
+    fireEvent.click(screen.getByText('Color & Cost'));
+    fireEvent.change(screen.getByLabelText('Material No.'), { target: { value: 'PM 70820' } });
+    const quickAddRow = screen.getByText('Quick Add (Stock)').closest('div[class*="justify-between"]');
+    fireEvent.click(quickAddRow!.querySelector('button[type="button"]')!);
+    const quantityInput = screen.getByText('Quantity').closest('div')!.querySelector('input[type="number"]')!;
+    fireEvent.change(quantityInput, { target: { value: '2' } });
+    submitCreate();
+
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+    expect(mockShowToast).toHaveBeenCalledWith(expect.stringContaining('material number'), 'warning');
+    expect(mockShowToast).not.toHaveBeenCalledWith(expect.any(String), 'error');
   });
 });

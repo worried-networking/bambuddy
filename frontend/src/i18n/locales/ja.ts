@@ -5319,6 +5319,7 @@ export default {
     materialNumberPlaceholder: '例：15',
     materialNumberHelp: '社内の購買番号です。同じ製品のすべてのスプールで共有され、同じ製品の新しいスプールに自動的に引き継がれます。',
     materialNumberHelpSpoolman: 'Spoolman ではフィラメントの品番として保存されるため、このフィラメントのすべてのスプールに表示されます。複数の番号はカンマで区切ってください。',
+    materialNumberNotSaved: 'スプールを作成しましたが、材料番号は保存されませんでした',
     lastDried: '最終乾燥',
     lastDriedNow: '今',
     lastDriedHelp: 'AMS の乾燥が予定時間の半分以上行われて終了すると記録されます。他の場所で乾燥したスプールはここで設定してください。',

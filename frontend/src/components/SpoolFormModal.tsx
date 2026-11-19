@@ -175,6 +175,10 @@ export function SpoolFormModal({
   // A ref, not state: the lookup's answer arrives after the render that asked
   // for it, and must see a preset the user picked in the meantime.
   const presetFromDefault = useRef(false);
+  // The material number of the catalog filament the user picked (Spoolman
+  // mode): what the field was prefilled with, so what a save compares against.
+  // undefined = no pick, null = the picked filament has no number.
+  const pickedMaterialNumber = useRef<string | null | undefined>(undefined);
   const [saveAsDefault, setSaveAsDefault] = useState(false);
   const [defaultScope, setDefaultScope] = useState<ProfileDefaultScope>('all');
   // The Printers tab's own setters mark it touched; the loaders here use the raw ones.
@@ -691,6 +695,8 @@ export function SpoolFormModal({
         ? { spoolman_filament_id: null }
         : {}),
     }));
+    // Changing a linked field drops the pick: the save resolves the filament itself.
+    if (spoolmanMode && isLinkedField) pickedMaterialNumber.current = undefined;
     if (key === 'weight_used') setWeightTouched(true);
     if (key === 'core_weight') setCoreWeightTouched(true);
     if (key === 'location_id') setLocationIdTouched(true);
@@ -714,8 +720,13 @@ export function SpoolFormModal({
     // prefilled a clear filament picked from the Spoolman catalogue as 808080FF.
     const colorHex = /^[0-9A-F]{6}(?:[0-9A-F]{2})?$/.test(rawHex) ? rawHex : '808080';
     const prefillRgba = colorHex.length === 8 ? colorHex : `${colorHex}FF`;
+    // The field shows the picked filament's own number(s), so a save that
+    // leaves it alone does not rewrite them.
+    const pickedNumber = filament.material_number?.trim() || null;
+    pickedMaterialNumber.current = pickedNumber;
     setFormData(prev => ({
       ...prev,
+      material_number: pickedNumber ?? '',
       spoolman_filament_id: filament.id,
       material,
       subtype,
@@ -734,24 +745,41 @@ export function SpoolFormModal({
 
   // Spoolman mode: the material number is the filament's article number, not a
   // field of the spool, so a changed number goes to the filament the saved
-  // spool belongs to, named by the save response. False when it was not saved.
-  const saveFilamentMaterialNumber = async (saved: InventorySpool | undefined): Promise<boolean> => {
+  // spool belongs to, named by the save response. The baseline is the number
+  // the field started from: the picked filament's, else the spool's own. When
+  // no filament was picked and the response shows another number on the
+  // filament than the baseline (the save resolved to a filament that already
+  // had numbers), the field's entries are merged into it instead of
+  // replacing it. False when the write failed; failAs picks the toast.
+  const saveFilamentMaterialNumber = async (
+    saved: InventorySpool | undefined,
+    failAs: 'error' | 'warning' = 'error',
+  ): Promise<boolean> => {
     if (!spoolmanMode) return true;
-    const next = formData.material_number.trim() || null;
-    if (next === (spool?.material_number?.trim() || null)) return true;
-    if (!saved?.spoolman_filament_id) {
-      showToast(t('inventory.saveFailed'), 'error');
+    const picked = pickedMaterialNumber.current;
+    const baseline = (picked !== undefined ? picked : spool?.material_number)?.trim() || null;
+    const typed = formData.material_number.trim() || null;
+    if (typed === baseline) return true;
+    const fail = (message: string) => {
+      showToast(failAs === 'warning' ? t('inventory.materialNumberNotSaved') : message, failAs);
       return false;
+    };
+    if (!saved?.spoolman_filament_id) return fail(t('inventory.saveFailed'));
+    let next = typed;
+    const current = saved.material_number?.trim() || null;
+    if (picked === undefined && saved.material_number !== undefined && current !== baseline) {
+      const kept = splitMaterialNumbers(current);
+      const merged = [...kept, ...splitMaterialNumbers(typed).filter((n) => !kept.includes(n))];
+      next = merged.join(',') || null;
+      if (next === current) return true;
     }
     try {
       await api.updateSpoolmanInventoryFilament(saved.spoolman_filament_id, { material_number: next });
       return true;
     } catch (error) {
-      showToast(
+      return fail(
         error instanceof ApiError && error.status === 503 ? t('inventory.spoolmanUnreachable') : t('inventory.saveFailed'),
-        'error',
       );
-      return false;
     }
   };
 
@@ -762,7 +790,9 @@ export function SpoolFormModal({
         ? api.createSpoolmanInventorySpool(data as Parameters<typeof api.createSpoolmanInventorySpool>[0])
         : api.createSpool(data as Parameters<typeof api.createSpool>[0]),
     onSuccess: async (newSpool) => {
-      if (!(await saveFilamentMaterialNumber(newSpool))) return;
+      // The spool exists, so a failed number write must not leave the create
+      // form open (a second Save would make a second spool): warn and go on.
+      await saveFilamentMaterialNumber(newSpool, 'warning');
       if (newSpool?.id) {
         const ok = await savePrinterProfiles(newSpool.id);
         if (!ok) return;
@@ -805,7 +835,8 @@ export function SpoolFormModal({
         : (result as InventorySpool[]);
 
       // Every copy belongs to the same filament, so one write covers them all.
-      if (createdSpools.length > 0 && !(await saveFilamentMaterialNumber(createdSpools[0]))) return;
+      // A failed write only warns: the spools exist (see createMutation).
+      if (createdSpools.length > 0) await saveFilamentMaterialNumber(createdSpools[0], 'warning');
 
       // Bulk create: every copy gets the same profiles and overrides. A no-op
       // when the user left the Printers tab alone (savePrinterProfiles), so a

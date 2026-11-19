@@ -532,12 +532,24 @@ class TestMaterialNumberSearch:
     @pytest.mark.asyncio
     @pytest.mark.integration
     async def test_without_parameter_lists_all_spools(self, async_client: AsyncClient, spool_factory):
-        await spool_factory(material_number="15")
-        await spool_factory(material_number=None)
+        from backend.app.schemas.spool import SpoolResponse
+
+        await spool_factory(material="PLA", brand="Bambu Lab", color_name="Red", material_number="15")
+        await spool_factory(material="ABS", brand="Bambu Lab", color_name="Black", material_number=None)
+        await spool_factory(material="PLA", brand="Anycubic", color_name="Blue", material_number="9319236810491")
 
         listing = await async_client.get("/api/v1/inventory/spools")
         assert listing.status_code == 200
-        assert len(listing.json()) == 2
+        rows = listing.json()
+        # Ordered by material, brand, colour; every row has the whole response shape.
+        assert [(s["material"], s["brand"], s["color_name"], s["material_number"]) for s in rows] == [
+            ("ABS", "Bambu Lab", "Black", None),
+            ("PLA", "Anycubic", "Blue", "9319236810491"),
+            ("PLA", "Bambu Lab", "Red", "15"),
+        ]
+        for row in rows:
+            assert set(row) == set(SpoolResponse.model_fields)
+            assert "spoolman_filament_id" not in row
 
     @pytest.mark.asyncio
     @pytest.mark.integration
@@ -613,3 +625,35 @@ class TestMaterialNumberSearch:
 
         resp = await async_client.get("/api/v1/inventory/spools", params={"material_number": "%"})
         assert resp.json() == []
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
+    async def test_pre_filter_escapes_wildcards_in_sql(self, async_client: AsyncClient, spool_factory, test_engine):
+        """The function post-filter hides a widened SQL set, so look at the SQL itself."""
+        from sqlalchemy import event
+
+        await spool_factory(material_number="10%")
+        await spool_factory(material_number="105")
+        await spool_factory(material_number="A_1")
+        await spool_factory(material_number="AB1")
+
+        seen: list[tuple[str, object]] = []
+
+        def capture(conn, cursor, statement, parameters, context, executemany):
+            if "material_number LIKE" in statement:
+                seen.append((statement, parameters))
+
+        event.listen(test_engine.sync_engine, "before_cursor_execute", capture)
+        try:
+            for wanted in ("10%", "A_1"):
+                resp = await async_client.get("/api/v1/inventory/spools", params={"material_number": wanted})
+                assert resp.status_code == 200
+        finally:
+            event.remove(test_engine.sync_engine, "before_cursor_execute", capture)
+
+        assert len(seen) == 2
+        for statement, _ in seen:
+            assert "ESCAPE" in statement
+        # The wildcard characters reach SQLite escaped, so the pre-filter itself
+        # returns only the literal match (a widened set would pass the API test too).
+        assert [params[-1] for _, params in seen] == ["10/%", "A/_1"]
