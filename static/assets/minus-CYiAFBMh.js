@@ -1,1 +1,0 @@
-import{w as e}from"./client-DRNp118u.js";var t=e(`minus`,[[`path`,{d:`M5 12h14`,key:`1ays0h`}]]);export{t};
